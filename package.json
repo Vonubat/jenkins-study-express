@@ -1,0 +1,13 @@
+{
+  "name": "jenkins-express-dummy",
+  "version": "1.0.0",
+  "description": "Dummy app for Jenkins study",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Running tests... PASS\" && exit 0"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
