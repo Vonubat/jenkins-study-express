@@ -5,6 +5,11 @@ pipeline {
         nodejs 'node24'
     }
 
+    environment {
+        // This maps the Jenkins credential 'prod-api-key' to the environment variable 'API_KEY'
+        API_KEY = credentials('prod-api-key')
+    }
+
     stages {
         stage('Checkout') {
             steps {
