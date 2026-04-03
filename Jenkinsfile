@@ -29,6 +29,16 @@ pipeline {
             }
         }
 
+        stage('Approval') {
+            input {
+                message 'Code looks good! Approve deployment to Production?'
+                ok 'Deploy to Prod'
+            }
+            steps {
+                echo 'Approval granted! Proceeding to deployment...'
+            }
+        }
+
         stage('Deploy') {
             steps {
                 echo 'Deploying to staging environment...'
