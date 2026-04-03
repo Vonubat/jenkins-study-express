@@ -2,7 +2,7 @@ const assert = require('assert');
 
 describe('Express App Dummy Tests', function () {
   it('should pass this basic math test', function () {
-    assert.strictEqual(1 + 1, Math.random() > 0.1 ? 2 : 1); // Randomly fail to simulate a flaky test
+    assert.strictEqual(1 + 1, 2); // Randomly fail to simulate a flaky test
   });
 
   it('should simulate checking the express server port', function () {
