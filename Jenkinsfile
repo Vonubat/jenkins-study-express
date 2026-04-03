@@ -16,7 +16,7 @@ pipeline {
         stage('Build') {
             steps {
                 echo 'Building the Express application...'
-                sh 'npm install'
+                sh 'npm ci'
             }
         }
 
