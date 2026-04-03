@@ -17,13 +17,15 @@ pipeline {
             steps {
                 echo 'Building the Express application...'
                 sh 'npm ci'
+                // Here we zip up the app so it's ready for deployment
+                sh 'tar -czf express-app.tar.gz index.js package.json node_modules/'
             }
         }
 
         stage('Test') {
             steps {
                 echo 'Running unit tests...'
-                sh 'echo "Pretending to run: npm test"'
+                sh 'npm test'
             }
         }
 
@@ -32,6 +34,17 @@ pipeline {
                 echo 'Deploying to staging environment...'
                 sh 'echo "App successfully deployed!"'
             }
+        }
+    }
+
+    post {
+        always {
+            // Jenkins will always read the test results, even if the pipeline failed
+            junit 'test-results.xml'
+        }
+        success {
+            // Jenkins will only save the artifact if the build and tests passed
+            archiveArtifacts artifacts: 'express-app.tar.gz', fingerprint: true
         }
     }
 }
