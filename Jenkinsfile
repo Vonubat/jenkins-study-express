@@ -39,7 +39,10 @@ pipeline {
 
         stage('Approval') {
             when {
-                branch 'main'
+                allOf {
+                    branch 'main'
+                    not { changeRequest() } // Explicitly tells Jenkins: DO NOT run this if it's a PR
+                }
             }
             input {
                 message 'Code looks good! Approve deployment to Production?'
@@ -52,7 +55,10 @@ pipeline {
 
         stage('Deploy') {
             when {
-                branch 'main'
+                allOf {
+                    branch 'main'
+                    not { changeRequest() } // Explicitly tells Jenkins: DO NOT run this if it's a PR
+                }
             }
             steps {
                 echo 'Deploying to staging environment...'
