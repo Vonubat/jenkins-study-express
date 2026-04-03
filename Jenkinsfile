@@ -21,18 +21,24 @@ pipeline {
         stage('Build') {
             steps {
                 echo 'Building the Express application...'
+                // 1. Install ALL dependencies (so we have TypeScript compiler available)
                 sh 'npm ci'
-                // Here we zip up the app so it's ready for deployment
-                sh 'tar -czf express-app.tar.gz index.js package.json node_modules/'
 
-                sh 'node index.js &'
-                sh 'sleep 3' // Wait 3 seconds to let it print
+                // 2. Compile TS to JS (This creates the /dist folder with the final script)
+                sh 'npm run build'
+
+                // 3. Strip away all devDependencies (Mocha, TS, etc.) to prepare for prod
+                sh 'npm prune --omit=dev'
+
+                // 4. Zip ONLY the necessary production files into our Artifact
+                sh 'tar -czf express-app.tar.gz dist/ package.json node_modules/'
             }
         }
 
         stage('Test') {
             steps {
                 echo 'Running unit tests...'
+                sh 'npm ci'
                 sh 'npm test'
             }
         }
