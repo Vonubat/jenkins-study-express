@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    tools {
+        nodejs 'node24'
+    }
+
     stages {
         stage('Checkout') {
             steps {
@@ -8,18 +12,21 @@ pipeline {
                 checkout scm
             }
         }
+
         stage('Build') {
             steps {
                 echo 'Building the Express application...'
-                sh 'echo "Pretending to run: npm install"'
+                sh 'npm install'
             }
         }
+
         stage('Test') {
             steps {
                 echo 'Running unit tests...'
                 sh 'echo "Pretending to run: npm test"'
             }
         }
+
         stage('Deploy') {
             steps {
                 echo 'Deploying to staging environment...'
