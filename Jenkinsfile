@@ -24,6 +24,9 @@ pipeline {
                 sh 'npm ci'
                 // Here we zip up the app so it's ready for deployment
                 sh 'tar -czf express-app.tar.gz index.js package.json node_modules/'
+
+                sh 'node index.js &'
+                sh 'sleep 3' // Wait 3 seconds to let it print
             }
         }
 
