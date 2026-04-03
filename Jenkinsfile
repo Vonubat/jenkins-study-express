@@ -39,6 +39,7 @@ pipeline {
 
         stage('Approval') {
             when {
+                beforeInput true
                 allOf {
                     branch 'main'
                     not { changeRequest() } // Explicitly tells Jenkins: DO NOT run this if it's a PR
