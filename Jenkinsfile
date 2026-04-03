@@ -38,6 +38,9 @@ pipeline {
         }
 
         stage('Approval') {
+            when {
+                branch 'main'
+            }
             input {
                 message 'Code looks good! Approve deployment to Production?'
                 ok 'Deploy to Prod'
@@ -48,6 +51,9 @@ pipeline {
         }
 
         stage('Deploy') {
+            when {
+                branch 'main'
+            }
             steps {
                 echo 'Deploying to staging environment...'
                 sh 'echo "App successfully deployed!"'
