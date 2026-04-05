@@ -32,21 +32,37 @@ pipeline {
             }
         }
 
-        stage('Package & Push Image') {
+        stage('Build Image') {
             steps {
                 echo 'Building local Docker image...'
                 sh 'docker build -t jenkins-express-dummy:latest .'
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            when {
+                allOf {
+                    branch 'main'
+                    not { changeRequest() }
+                }
+            }
+            steps {
+                script {
+                    env.APP_VERSION = sh(script: "grep '\"version\"' package.json | cut -d '\"' -f4 | head -n 1", returnStdout: true).trim()
+                    echo "Detected application version: ${env.APP_VERSION}"
+                }
 
                 withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
                     echo 'Logging into Docker Hub...'
-
                     sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
 
-                    echo 'Tagging image for remote registry...'
+                    echo 'Tagging image with "latest" AND specific version...'
                     sh 'docker tag jenkins-express-dummy:latest ${DOCKER_USER}/jenkins-express-dummy:latest'
+                    sh 'docker tag jenkins-express-dummy:latest ${DOCKER_USER}/jenkins-express-dummy:${APP_VERSION}'
 
-                    echo 'Pushing image to Docker Hub!'
+                    echo 'Pushing both tags to Docker Hub!'
                     sh 'docker push ${DOCKER_USER}/jenkins-express-dummy:latest'
+                    sh 'docker push ${DOCKER_USER}/jenkins-express-dummy:${APP_VERSION}'
                 }
             }
         }
@@ -77,9 +93,10 @@ pipeline {
             }
             steps {
                 withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
-                    echo 'Deploying the new Docker container from the Registry...'
+                    echo "Deploying version ${APP_VERSION} from the Registry..."
                     sh 'docker rm -f my-express-prod || true'
-                    sh 'docker run -d --name my-express-prod -p 3000:3000 -e API_KEY=${API_KEY} ${DOCKER_USER}/jenkins-express-dummy:latest'
+
+                    sh 'docker run -d --name my-express-prod -p 3000:3000 -e API_KEY=${API_KEY} ${DOCKER_USER}/jenkins-express-dummy:${APP_VERSION}'
                 }
             }
         }
