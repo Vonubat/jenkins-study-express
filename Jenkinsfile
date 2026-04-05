@@ -1,11 +1,6 @@
 pipeline {
     agent any
 
-    tools {
-        nodejs 'node24'
-        dockerTool 'docker-cli'
-    }
-
     environment {
         API_KEY = credentials('prod-api-key')
     }
