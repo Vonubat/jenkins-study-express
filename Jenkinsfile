@@ -91,21 +91,21 @@ pipeline {
         }
         success {
             echo 'Sending success notification to Telegram...'
-            sh """
-                curl -s -X POST https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
-                -d chat_id=${TELEGRAM_CHAT_ID} \
+            sh '''
+                curl -s -X POST https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage \
+                -d chat_id=$TELEGRAM_CHAT_ID \
                 -d parse_mode=Markdown \
-                -d text="✅ *Build SUCCESS* ✅%0A*Project:* ${env.JOB_NAME}%0A*Build ID:* #${env.BUILD_NUMBER}%0A*Branch:* ${env.BRANCH_NAME}"
-            """
+                -d text="✅ *Build SUCCESS* ✅%0A*Project:* $JOB_NAME%0A*Build ID:* #$BUILD_NUMBER%0A*Branch:* $BRANCH_NAME"
+            '''
         }
         failure {
             echo 'Sending failure notification to Telegram...'
-            sh """
-                curl -s -X POST https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
-                -d chat_id=${TELEGRAM_CHAT_ID} \
+            sh '''
+                curl -s -X POST https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage \
+                -d chat_id=$TELEGRAM_CHAT_ID \
                 -d parse_mode=Markdown \
-                -d text="🚨 *Build FAILED* 🚨%0A*Project:* ${env.JOB_NAME}%0A*Build ID:* #${env.BUILD_NUMBER}%0A*Branch:* ${env.BRANCH_NAME}%0ACheck Jenkins for logs!"
-            """
+                -d text="🚨 *Build FAILED* 🚨%0A*Project:* $JOB_NAME%0A*Build ID:* #$BUILD_NUMBER%0A*Branch:* $BRANCH_NAME%0ACheck Jenkins for logs!"
+            '''
         }
     }
 }
