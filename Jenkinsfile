@@ -3,6 +3,8 @@ pipeline {
 
     environment {
         API_KEY = credentials('prod-api-key')
+        TELEGRAM_TOKEN = credentials('telegram-token')
+        TELEGRAM_CHAT_ID = credentials('telegram-chat-id')
     }
 
     stages {
@@ -75,6 +77,24 @@ pipeline {
     post {
         always {
             junit 'test-results.xml'
+        }
+        success {
+            echo 'Sending success notification to Telegram...'
+            sh """
+                curl -s -X POST https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
+                -d chat_id=${TELEGRAM_CHAT_ID} \
+                -d parse_mode=Markdown \
+                -d text="✅ *Build SUCCESS* ✅%0A*Project:* ${env.JOB_NAME}%0A*Build ID:* #${env.BUILD_NUMBER}%0A*Branch:* ${env.BRANCH_NAME}"
+            """
+        }
+        failure {
+            echo 'Sending failure notification to Telegram...'
+            sh """
+                curl -s -X POST https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
+                -d chat_id=${TELEGRAM_CHAT_ID} \
+                -d parse_mode=Markdown \
+                -d text="🚨 *Build FAILED* 🚨%0A*Project:* ${env.JOB_NAME}%0A*Build ID:* #${env.BUILD_NUMBER}%0A*Branch:* ${env.BRANCH_NAME}%0ACheck Jenkins for logs!"
+            """
         }
     }
 }
