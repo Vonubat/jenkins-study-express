@@ -32,12 +32,22 @@ pipeline {
             }
         }
 
-        stage('Package Docker Image') {
-            // This stage falls back to 'agent any' (the Master)
-            // because the Master is the one connected to the Docker socket!
+        stage('Package & Push Image') {
             steps {
-                echo 'Building Docker image...'
+                echo 'Building local Docker image...'
                 sh 'docker build -t jenkins-express-dummy:latest .'
+
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
+                    echo 'Logging into Docker Hub...'
+
+                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+
+                    echo 'Tagging image for remote registry...'
+                    sh 'docker tag jenkins-express-dummy:latest ${DOCKER_USER}/jenkins-express-dummy:latest'
+
+                    echo 'Pushing image to Docker Hub!'
+                    sh 'docker push ${DOCKER_USER}/jenkins-express-dummy:latest'
+                }
             }
         }
 
@@ -50,11 +60,11 @@ pipeline {
                 }
             }
             input {
-                message 'Code looks good! Approve deployment to Production?'
-                ok 'Deploy to Prod'
+                message 'Image pushed to Docker Hub! Deploy to Prod?'
+                ok 'Deploy'
             }
             steps {
-                echo 'Approval granted! Proceeding to deployment...'
+                echo 'Approval granted!'
             }
         }
 
@@ -66,10 +76,11 @@ pipeline {
                 }
             }
             steps {
-                echo 'Deploying the new Docker container...'
-
-                sh 'docker rm -f my-express-prod || true'
-                sh 'docker run -d --name my-express-prod -p 3000:3000 -e API_KEY=${API_KEY} jenkins-express-dummy:latest'
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
+                    echo 'Deploying the new Docker container from the Registry...'
+                    sh 'docker rm -f my-express-prod || true'
+                    sh 'docker run -d --name my-express-prod -p 3000:3000 -e API_KEY=${API_KEY} ${DOCKER_USER}/jenkins-express-dummy:latest'
+                }
             }
         }
     }
