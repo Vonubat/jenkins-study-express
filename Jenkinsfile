@@ -7,36 +7,38 @@ pipeline {
     }
 
     environment {
-        // This maps the Jenkins credential 'prod-api-key' to the environment variable 'API_KEY'
         API_KEY = credentials('prod-api-key')
     }
 
     stages {
         stage('Checkout') {
             steps {
-                // This tells Jenkins to pull the code from the Git repository
                 checkout scm
             }
         }
 
-        stage('Test') {
+        stage('Test & Compile') {
+            agent {
+                docker {
+                    image 'node:24-alpine'
+                    reuseNode true
+                }
+            }
             steps {
-                echo 'Installing all dependencies for testing...'
+                echo 'Hello from inside the temporary Node container!'
+                sh 'node -v'
+
                 sh 'npm ci'
-                echo 'Running unit tests...'
                 sh 'npm test'
+                sh 'npm run build'
+                sh 'npm prune --omit=dev'
             }
         }
 
-        stage('Build & Package') {
+        stage('Package Docker Image') {
+            // This stage falls back to 'agent any' (the Master)
+            // because the Master is the one connected to the Docker socket!
             steps {
-                echo 'Compiling TypeScript...'
-                sh 'npm run build'
-
-                echo 'Pruning dev dependencies for production...'
-                sh 'npm prune --omit=dev'
-
-                // We no longer zip a tar.gz! Instead, we build a Docker image.
                 echo 'Building Docker image...'
                 sh 'docker build -t jenkins-express-dummy:latest .'
             }
@@ -47,7 +49,7 @@ pipeline {
                 beforeInput true
                 allOf {
                     branch 'main'
-                    not { changeRequest() } // Explicitly tells Jenkins: DO NOT run this if it's a PR
+                    not { changeRequest() }
                 }
             }
             input {
@@ -68,12 +70,8 @@ pipeline {
             }
             steps {
                 echo 'Deploying the new Docker container...'
-                // 1. Remove the old container if it exists (so ports don't clash)
-                // The "|| true" prevents the pipeline from failing on the very first run when no container exists yet.
-                sh 'docker rm -f my-express-prod || true'
 
-                // 2. Run the new container, mapping Windows port 3000 to Container port 3000
-                // We inject the API_KEY environment variable directly into the container!
+                sh 'docker rm -f my-express-prod || true'
                 sh 'docker run -d --name my-express-prod -p 3000:3000 -e API_KEY=${API_KEY} jenkins-express-dummy:latest'
             }
         }
@@ -81,7 +79,6 @@ pipeline {
 
     post {
         always {
-            // Jenkins will always read the test results, even if the pipeline failed
             junit 'test-results.xml'
         }
     }
