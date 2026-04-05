@@ -84,9 +84,5 @@ pipeline {
             // Jenkins will always read the test results, even if the pipeline failed
             junit 'test-results.xml'
         }
-        success {
-            // Jenkins will only save the artifact if the build and tests passed
-            archiveArtifacts artifacts: 'express-app.tar.gz', fingerprint: true
-        }
     }
 }
