@@ -3,6 +3,7 @@ pipeline {
 
     tools {
         nodejs 'node24'
+        dockerTool 'docker-cli'
     }
 
     environment {
@@ -18,28 +19,26 @@ pipeline {
             }
         }
 
-        stage('Build') {
+        stage('Test') {
             steps {
-                echo 'Building the Express application...'
-                // 1. Install ALL dependencies (so we have TypeScript compiler available)
+                echo 'Installing all dependencies for testing...'
                 sh 'npm ci'
-
-                // 2. Compile TS to JS (This creates the /dist folder with the final script)
-                sh 'npm run build'
-
-                // 3. Strip away all devDependencies (Mocha, TS, etc.) to prepare for prod
-                sh 'npm prune --omit=dev'
-
-                // 4. Zip ONLY the necessary production files into our Artifact
-                sh 'tar -czf express-app.tar.gz dist/ package.json node_modules/'
+                echo 'Running unit tests...'
+                sh 'npm test'
             }
         }
 
-        stage('Test') {
+        stage('Build & Package') {
             steps {
-                echo 'Running unit tests...'
-                sh 'npm ci'
-                sh 'npm test'
+                echo 'Compiling TypeScript...'
+                sh 'npm run build'
+
+                echo 'Pruning dev dependencies for production...'
+                sh 'npm prune --omit=dev'
+
+                // We no longer zip a tar.gz! Instead, we build a Docker image.
+                echo 'Building Docker image...'
+                sh 'docker build -t jenkins-express-dummy:latest .'
             }
         }
 
@@ -64,12 +63,18 @@ pipeline {
             when {
                 allOf {
                     branch 'main'
-                    not { changeRequest() } // Explicitly tells Jenkins: DO NOT run this if it's a PR
+                    not { changeRequest() }
                 }
             }
             steps {
-                echo 'Deploying to staging environment...'
-                sh 'echo "App successfully deployed!"'
+                echo 'Deploying the new Docker container...'
+                // 1. Remove the old container if it exists (so ports don't clash)
+                // The "|| true" prevents the pipeline from failing on the very first run when no container exists yet.
+                sh 'docker rm -f my-express-prod || true'
+
+                // 2. Run the new container, mapping Windows port 3000 to Container port 3000
+                // We inject the API_KEY environment variable directly into the container!
+                sh 'docker run -d --name my-express-prod -p 3000:3000 -e API_KEY=${API_KEY} jenkins-express-dummy:latest'
             }
         }
     }
@@ -78,10 +83,6 @@ pipeline {
         always {
             // Jenkins will always read the test results, even if the pipeline failed
             junit 'test-results.xml'
-        }
-        success {
-            // Jenkins will only save the artifact if the build and tests passed
-            archiveArtifacts artifacts: 'express-app.tar.gz', fingerprint: true
         }
     }
 }
