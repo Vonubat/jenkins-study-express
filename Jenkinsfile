@@ -32,12 +32,38 @@ pipeline {
             }
         }
 
-        stage('Package Docker Image') {
-            // This stage falls back to 'agent any' (the Master)
-            // because the Master is the one connected to the Docker socket!
+        stage('Build Image') {
             steps {
-                echo 'Building Docker image...'
+                echo 'Building local Docker image...'
                 sh 'docker build -t jenkins-express-dummy:latest .'
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            when {
+                allOf {
+                    branch 'main'
+                    not { changeRequest() }
+                }
+            }
+            steps {
+                script {
+                    env.APP_VERSION = sh(script: "grep '\"version\"' package.json | cut -d '\"' -f4 | head -n 1", returnStdout: true).trim()
+                    echo "Detected application version: ${env.APP_VERSION}"
+                }
+
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
+                    echo 'Logging into Docker Hub...'
+                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+
+                    echo 'Tagging image with "latest" AND specific version...'
+                    sh 'docker tag jenkins-express-dummy:latest ${DOCKER_USER}/jenkins-express-dummy:latest'
+                    sh 'docker tag jenkins-express-dummy:latest ${DOCKER_USER}/jenkins-express-dummy:${APP_VERSION}'
+
+                    echo 'Pushing both tags to Docker Hub!'
+                    sh 'docker push ${DOCKER_USER}/jenkins-express-dummy:latest'
+                    sh 'docker push ${DOCKER_USER}/jenkins-express-dummy:${APP_VERSION}'
+                }
             }
         }
 
@@ -50,11 +76,11 @@ pipeline {
                 }
             }
             input {
-                message 'Code looks good! Approve deployment to Production?'
-                ok 'Deploy to Prod'
+                message 'Image pushed to Docker Hub! Deploy to Prod?'
+                ok 'Deploy'
             }
             steps {
-                echo 'Approval granted! Proceeding to deployment...'
+                echo 'Approval granted!'
             }
         }
 
@@ -66,10 +92,12 @@ pipeline {
                 }
             }
             steps {
-                echo 'Deploying the new Docker container...'
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
+                    echo "Deploying version ${APP_VERSION} from the Registry..."
+                    sh 'docker rm -f my-express-prod || true'
 
-                sh 'docker rm -f my-express-prod || true'
-                sh 'docker run -d --name my-express-prod -p 3000:3000 -e API_KEY=${API_KEY} jenkins-express-dummy:latest'
+                    sh 'docker run -d --name my-express-prod -p 3000:3000 -e API_KEY=${API_KEY} ${DOCKER_USER}/jenkins-express-dummy:${APP_VERSION}'
+                }
             }
         }
     }
@@ -80,21 +108,21 @@ pipeline {
         }
         success {
             echo 'Sending success notification to Telegram...'
-            sh """
-                curl -s -X POST https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
-                -d chat_id=${TELEGRAM_CHAT_ID} \
+            sh '''
+                curl -s -X POST https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage \
+                -d chat_id=$TELEGRAM_CHAT_ID \
                 -d parse_mode=Markdown \
-                -d text="✅ *Build SUCCESS* ✅%0A*Project:* ${env.JOB_NAME}%0A*Build ID:* #${env.BUILD_NUMBER}%0A*Branch:* ${env.BRANCH_NAME}"
-            """
+                -d text="✅ *Build SUCCESS* ✅%0A*Project:* $JOB_NAME%0A*Build ID:* #$BUILD_NUMBER%0A*Branch:* $BRANCH_NAME"
+            '''
         }
         failure {
             echo 'Sending failure notification to Telegram...'
-            sh """
-                curl -s -X POST https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage \
-                -d chat_id=${TELEGRAM_CHAT_ID} \
+            sh '''
+                curl -s -X POST https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage \
+                -d chat_id=$TELEGRAM_CHAT_ID \
                 -d parse_mode=Markdown \
-                -d text="🚨 *Build FAILED* 🚨%0A*Project:* ${env.JOB_NAME}%0A*Build ID:* #${env.BUILD_NUMBER}%0A*Branch:* ${env.BRANCH_NAME}%0ACheck Jenkins for logs!"
-            """
+                -d text="🚨 *Build FAILED* 🚨%0A*Project:* $JOB_NAME%0A*Build ID:* #$BUILD_NUMBER%0A*Branch:* $BRANCH_NAME%0ACheck Jenkins for logs!"
+            '''
         }
     }
 }
